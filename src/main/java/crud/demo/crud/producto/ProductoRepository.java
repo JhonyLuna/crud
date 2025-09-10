@@ -1,11 +1,9 @@
 package crud.demo.crud.producto;
 
-import java.util.List;
-
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ProductoRepository  extends JpaRepository<Producto, Long> {
 
-   List<Producto> findByNombreContainingIgnoreCase(String q);
-
+     boolean existsByNombreIgnoreCase(String nombre); // para validación de unicidad en el post
+     boolean existsByNombreIgnoreCaseAndIdNot(String nombre, Long id); // para validación de unicidad en el put
 }  

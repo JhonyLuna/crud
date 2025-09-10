@@ -1,42 +1,55 @@
 package crud.demo.crud.producto;
 
-import org.springframework.http.HttpStatus;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.List;
-
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // Manejar errores de validación (POST / PUT con @Valid)
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<?> handleValidationErrors(MethodArgumentNotValidException ex) {
-        List<String> errores = ex.getFieldErrors()
-                .stream()
-                .map(e -> e.getField() + ": " + e.getDefaultMessage())
-                .toList();
+    public ResponseEntity<Map<String, Object>> handleMethodArgNotValid(MethodArgumentNotValidException ex) {
+        // 1) Recolecta errores por campo con mensajes diferenciados
+        Map<String, String> fields = new LinkedHashMap<>();
+        ex.getBindingResult().getFieldErrors().forEach(fe -> {
+            String field = fe.getField();
+            Object rejected = fe.getRejectedValue(); // null si el campo NO vino en el JSON
+            String code = fe.getCode(); // "NotNull", "NotBlank", "Size", "Positive", etc.
 
-        return ResponseEntity.badRequest().body(errores);
+            String msg;
+            if ("NotNull".equals(code) || "NotBlank".equals(code) || "NotEmpty".equals(code)) {
+                if (rejected == null) {
+                    // No vino en el JSON
+                    msg = "El campo '" + field + "' es obligatorio";
+                } else if (rejected instanceof String s && s.trim().isEmpty()) {
+                    // Vino, pero vacío o solo espacios
+                    msg = "El campo '" + field + "' no debe estar vacío";
+                } else {
+                    // Otro caso (por si acaso), usa el mensaje de la anotación
+                    msg = fe.getDefaultMessage();
+                }
+            } else {
+                // Para otras reglas (Size, Pattern, Digits, DecimalMin, Positive, etc.)
+                msg = fe.getDefaultMessage();
+            }
+
+            fields.putIfAbsent(field, msg); // conserva el primer mensaje por campo
+        });
+
+        // 2) Arma el JSON final { mensaje{...}, fields{...} }
+        Map<String, Object> root = new LinkedHashMap<>();
+        Map<String, Object> mensaje = new LinkedHashMap<>();
+        mensaje.put("status", 400);
+        mensaje.put("error", "Bad Request");
+
+        root.put("mensaje", mensaje);
+        root.put("fields", fields);
+
+        return ResponseEntity.badRequest().body(root);
     }
 
-
-       // Captura errores de JSON mal formateado
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<?> handleInvalidJson(HttpMessageNotReadableException ex) {
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body("El formato del JSON es inválido o incompleto. Verifique los datos enviados.");
-    }
-
-        @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<?> handleRuntime(RuntimeException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ex.getMessage());
-    }
-
-      
 }

@@ -22,29 +22,22 @@ public class ProductoController {
 
     // POST /api/productos         -> crear
     @PostMapping
-    public ResponseEntity<ProductoResponsDto> crear(@Valid @RequestBody ProductoDto body) {
-        Producto nuevoProducto = new Producto(body.getNombre(), body.getDescripcion(),body.getPrecio() );
-        Producto productoCreado = service.crear(nuevoProducto);
-
-        ProductoResponsDto responsDto = new ProductoResponsDto();
-        responsDto.setMensaje("producto creado con exito");
-        responsDto.setNombre(productoCreado.getNombre());
-        
-        return new ResponseEntity<>(responsDto, HttpStatus.CREATED);
+    public ResponseEntity<Producto> crear(@Valid @RequestBody Producto body) {
+        Producto productoCreado = service.crear(body);
+        return new ResponseEntity<>(productoCreado, HttpStatus.CREATED);
     }   
 
     // GET /api/productos/{id}     -> obtener por id
     @GetMapping("/{id}")
-    public ProductoConsultaDto obtener(@PathVariable Long id) {
-        Producto buscarProducto = service.buscarPorId(id);
-        return new ProductoConsultaDto(buscarProducto.getNombre());
+    public Producto obtener(@PathVariable Long id) {
+        return service.buscarPorId(id);
     }
 
     
     // GET /api/productos?q=texto  -> obtener todos los productos (filtrado opcional)
      @GetMapping
-    public List<ProductoConsultaDto> listar(@RequestParam(value = "q", required = false) String q) {
-        return service.listar(q);
+    public List<Producto> listar() {
+        return service.listar();
     }
 
     // PUT /api/productos/{id}     -> actualizar

@@ -1,41 +1,119 @@
 package crud.demo.crud;
 
+import crud.demo.crud.producto.GlobalExceptionHandler;
+import crud.demo.crud.producto.Producto;
+import crud.demo.crud.producto.ProductoController;
+import crud.demo.crud.producto.ProductoService;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.web.servlet.MockMvc;
+import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
-@AutoConfigureMockMvc //es una clase de Spring para simular llamadas HTTP (GET, POST, PUT, DELETE). no se necesita postman para probasr
+//anotaciones de clase
+@WebMvcTest(controllers = ProductoController.class) // con este slice o capa web llamamos al controlador real
+@Import(GlobalExceptionHandler.class) // asegura que el advice se aplique en el slice web
 class ProductoControllerTest {
 
     @Autowired
-    private MockMvc mockMvc; //Con este objeto, puedes simular peticiones HTTP hacia tu ProductoController.
+    private MockMvc mockMvc; // para hacer requests simuladas al controlador
 
-  @Test
-void crearProducto_deberiaRetornar201ConNombreEnElBody() throws Exception {
-    // 1. JSON de entrada simulado
-    String jsonRequest = """
-        {
-            "nombre": "pc",
-            "precio": 1200
-        }
-        """;
+    @MockBean
+    private ProductoService service; // mock del servicio para controlar su comportamiento en tests
 
-    // 2. Simular POST y verificar respuesta
-    mockMvc.perform(post("/api/productos") //mockMvc.perform ejecuta la peticion HTTP se le pasa la ruta con el metodo en este caso post
-                    .contentType(MediaType.APPLICATION_JSON)// .contentType. simula el header como en postmancontentType(MediaType.APPLICATION_JSON)
-                    .content(jsonRequest))
-            .andExpect(status().isCreated()) // ✅ debe ser 201
-            .andExpect(jsonPath("$.nombre").value("pc")); // ✅ body debe tener el nombre
-            //.andExpect(status().isBadRequest()) // ✅ debe ser 400
-            //.andExpect(jsonPath("$[0]").value("precio: El precio debe ser mayor a 0")); // ✅ valida primer error
-}
+    @Test
+    @DisplayName("Happy path: POST válido -> 201 y regresa el producto creado")
+    void crearProducto_deberiaRetornar201_conBody() throws Exception {
+        // Arrange (mock del service para que devuelva un producto “creado”)
+        Producto creado = new Producto("computadora", "desc válida", 1200.0);
+        creado.setId(1L);
+        when(service.crear(ArgumentMatchers.any(Producto.class))).thenReturn(creado);
 
+        String jsonRequest = """
+            {
+              "nombre": "computadora",
+              "descripcion": "desc válida",
+              "precio": 1200
+            }
+            """;
+
+        // Act & Assert
+        mockMvc.perform(post("/api/productos")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonRequest))
+            .andExpect(status().isCreated())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+            // Ajusta estos asserts al body real que regresa tu controlador
+            .andExpect(jsonPath("$.id").value(1))
+            .andExpect(jsonPath("$.nombre").value("computadora"))
+            .andExpect(jsonPath("$.descripcion").value("desc válida"))
+            .andExpect(jsonPath("$.precio").value(1200.0));
+    }
+
+    @Test
+    @DisplayName("Unhappy: falta 'descripcion' (campo ausente) -> 400 con 'es obligatorio'")
+    void crearProducto_400_faltaDescripcion() throws Exception {
+        String jsonRequest = """
+            {
+              "nombre": "carro",
+              "precio": 10
+            }
+            """;
+
+        mockMvc.perform(post("/api/productos")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonRequest))
+            .andExpect(status().isBadRequest())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+            .andExpect(jsonPath("$.mensaje.status").value(400))
+            .andExpect(jsonPath("$.mensaje.error").value("Bad Request"))
+            .andExpect(jsonPath("$.fields.descripcion").value("El campo 'descripcion' es obligatorio"));
+    }
+
+    @Test
+    @DisplayName("Unhappy: 'descripcion' presente pero vacío -> 400 con 'no debe estar vacío'")
+    void crearProducto_400_descripcionVacia() throws Exception {
+        String jsonRequest = """
+            {
+              "nombre": "carro",
+              "descripcion": "",
+              "precio": 10
+            }
+            """;
+
+        mockMvc.perform(post("/api/productos")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonRequest))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.mensaje.status").value(400))
+            .andExpect(jsonPath("$.mensaje.error").value("Bad Request"))
+            .andExpect(jsonPath("$.fields.descripcion").value("El campo 'descripcion' no debe estar vacío"));
+    }
+
+    @Test
+    @DisplayName("Unhappy: falta 'precio' -> 400 con 'es obligatorio'")
+    void crearProducto_400_faltaPrecio() throws Exception {
+        String jsonRequest = """
+            {
+              "nombre": "carro",
+              "descripcion": "rojo"
+            }
+            """;
+
+        mockMvc.perform(post("/api/productos")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonRequest))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.mensaje.status").value(400))
+            .andExpect(jsonPath("$.mensaje.error").value("Bad Request"))
+            .andExpect(jsonPath("$.fields.precio").value("El campo 'precio' es obligatorio"));
+    }
 }

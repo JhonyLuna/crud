@@ -1,11 +1,13 @@
 package crud.demo.crud.producto;
 
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 
 @Entity
 @Table(name = "productos")
@@ -15,14 +17,16 @@ public class Producto {
     @GeneratedValue(strategy = GenerationType.IDENTITY) // Auto-incremental
     private Long id; // Atributo id
 
-    @Column(nullable = false) // No nulo
+   
+     @NotBlank(message = "El nombre no debe estar vacio")
      private String nombre;
 
-     @Column(nullable = false) 
+     @NotBlank(message = "El nombre no debe estar vacio")
      private String descripcion;
-
-    @Column(nullable = false)
-    private Double precio;
+    
+     @NotNull(message  = "El campo es obligatorio")
+     @Positive(message = "El precio debe ser mayor que cero")
+     private Double precio;
 
     // Constructor vacío
     protected Producto() {}
@@ -53,7 +57,7 @@ public class Producto {
         return descripcion;
     }
 
-    void setDescripcion(String descripcion) {
+    public void setDescripcion(String descripcion) {
         this.descripcion = descripcion;
     }
 
